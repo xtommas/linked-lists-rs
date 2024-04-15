@@ -16,6 +16,19 @@ struct Node {
     next: Link,
 }
 
+impl Drop for List {
+    fn drop(&mut self) {
+        let mut cur_link = mem::replace(&mut self.head, Link::Empty);
+        // 'while let' = do this until the pattern doesn't match
+        while let Link::More(mut boxed_node) = cur_link {
+            cur_link = mem::replace(&mut boxed_node.next, Link::Empty);
+            // boxed_node goes out of scope here and gets dropped;
+            // but its node's next field has been set to Link::Empty
+            // so no unbounded recursion occurs
+        }
+    }
+}
+
 impl List {
     // static method (doesn't take self as an argument)
     // New
