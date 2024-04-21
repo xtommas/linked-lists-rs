@@ -5,7 +5,7 @@ pub struct List<T> {
     tail: *mut Node<T>,
 }
 
-type Link<T> = Option<Box<Node<T>>>;
+type Link<T> = *mut Node<T>;
 
 struct Node<T> {
     elem: T,
@@ -15,41 +15,51 @@ struct Node<T> {
 impl<T> List<T> {
     pub fn new() -> Self {
         List {
-            head: None,
+            head: ptr::null_mut(),
             tail: ptr::null_mut(),
         }
     }
 
     pub fn push(&mut self, elem: T) {
-        let mut new_tail = Box::new(Node {
-            elem: elem,
-            next: None,
-        });
+        unsafe {
+            let new_tail = Box::into_raw(Box::new(Node {
+                elem: elem,
+                next: ptr::null_mut(),
+            }));
 
-        let raw_tail: *mut _ = &mut *new_tail;
-
-        if !self.tail.is_null() {
-            unsafe {
-                (*self.tail).next = Some(new_tail);
+            if !self.tail.is_null() {
+                unsafe {
+                    (*self.tail).next = new_tail;
+                }
+            } else {
+                self.head = new_tail;
             }
-        } else {
-            self.head = Some(new_tail);
-        }
 
-        self.tail = raw_tail;
+            self.tail = new_tail;
+        }
     }
 
     pub fn pop(&mut self) -> Option<T> {
-        self.head.take().map(|head| {
-            let head = *head;
-            self.head = head.next;
+        unsafe {
+            if self.head.is_null() {
+                None
+            } else {
+                let head = Box::from_raw(self.head);
+                self.head = head.next;
 
-            if self.head.is_none() {
-                self.tail = ptr::null_mut();
+                if self.head.is_null() {
+                    self.tail = ptr::null_mut();
+                }
+
+                Some(head.elem)
             }
+        }
+    }
+}
 
-            head.elem
-        })
+impl<T> Drop for List<T> {
+    fn drop(&mut self) {
+        while let Some(_) = self.pop() {}
     }
 }
 
